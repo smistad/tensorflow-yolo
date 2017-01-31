@@ -1,11 +1,7 @@
-
-
-
-
 import os
 import math
+import PIL
 import random
-import cv2
 import numpy as np
 from queue import Queue 
 from threading import Thread
@@ -80,15 +76,15 @@ class TextDataSet(DataSet):
       labels: 2-D list [self.max_objects, 5] (xcenter, ycenter, w, h, class_num)
       object_num:  total object number  int 
     """
-    image = cv2.imread(record[0])
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    h = image.shape[0]
-    w = image.shape[1]
+    image = PIL.Image.open(record[0])
+    h = image.height
+    w = image.width
 
     width_rate = self.width * 1.0 / w 
     height_rate = self.height * 1.0 / h 
 
-    image = cv2.resize(image, (self.height, self.width))
+    image = image.resize((self.height, self.width), PIL.Image.ANTIALIAS)
+    image = np.array(image)
 
     labels = [[0, 0, 0, 0, 0]] * self.max_objects
     i = 1

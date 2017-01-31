@@ -4,8 +4,10 @@ sys.path.append('./')
 
 from yolo.net.yolo_tiny_net import YoloTinyNet 
 import tensorflow as tf 
-import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import PIL
 
 classes_name =  ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train","tvmonitor"]
 
@@ -62,13 +64,11 @@ predicts = net.inference(image)
 
 sess = tf.Session()
 
-np_img = cv2.imread('cat.jpg')
-resized_img = cv2.resize(np_img, (448, 448))
-np_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
-
-
+# Load and resize image
+img = PIL.Image.open('cat.jpg')
+resized_img = img.resize((448, 448), PIL.Image.ANTIALIAS)
+np_img = np.array(resized_img)
 np_img = np_img.astype(np.float32)
-
 np_img = np_img / 255.0 * 2 - 1
 np_img = np.reshape(np_img, (1, 448, 448, 3))
 
@@ -80,7 +80,25 @@ np_predict = sess.run(predicts, feed_dict={image: np_img})
 
 xmin, ymin, xmax, ymax, class_num = process_predicts(np_predict)
 class_name = classes_name[class_num]
-cv2.rectangle(resized_img, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 0, 255))
-cv2.putText(resized_img, class_name, (int(xmin), int(ymin)), 2, 1.5, (0, 0, 255))
-cv2.imwrite('cat_out.jpg', resized_img)
+
+
+def draw_box(ax, xmin, ymin, xmax, ymax):
+    ax.add_patch(
+        patches.Rectangle(
+            (xmin, ymin),  # (x,y)
+            xmax-xmin,  # width
+            ymax-ymin,  # height
+            fill=False,
+            edgecolor='red',
+            linewidth=2,
+        )
+    )
+
+# Draw image and box
+f, ax = plt.subplots(1, 1, figsize=(20, 20))
+ax.imshow(resized_img)
+draw_box(ax, int(xmin), int(ymin), int(xmax), int(ymax))
+print(class_name)
+plt.show()
+
 sess.close()
