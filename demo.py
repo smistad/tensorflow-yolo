@@ -9,53 +9,70 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import PIL
 
-classes_name =  ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train","tvmonitor"]
+classes_name = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train","tvmonitor"]
 
 
 def process_predicts(predicts):
-  p_classes = predicts[0, :, :, 0:20]
-  C = predicts[0, :, :, 20:22]
-  coordinate = predicts[0, :, :, 22:]
-
-  p_classes = np.reshape(p_classes, (7, 7, 1, 20))
-  C = np.reshape(C, (7, 7, 2, 1))
-
-  P = C * p_classes
-
-  #print P[5,1, 0, :]
-
-  index = np.argmax(P)
-
-  index = np.unravel_index(index, P.shape)
-
-  class_num = index[3]
-
+  # 2 Boxes per grid cell
+  p_classes = predicts[0, :, :, 0:20]   # Probability of each class
+  C = predicts[0, :, :, 20:22]          # Box confidences, 2 per grid cell
+  coordinate = predicts[0, :, :, 22:]   # Coordinates and sizes
   coordinate = np.reshape(coordinate, (7, 7, 2, 4))
+  p_classes = np.reshape(p_classes, (7, 7, 1, 20)) # Probability of each class in each grid cell given object
+  C = np.reshape(C, (7, 7, 2, 1))       # Box confidences?
 
-  max_coordinate = coordinate[index[0], index[1], index[2], :]
+  P = C * p_classes     # (Shape: 7, 7, 2, 20)
 
-  xcenter = max_coordinate[0]
-  ycenter = max_coordinate[1]
-  w = max_coordinate[2]
-  h = max_coordinate[3]
+  objects = []
 
-  xcenter = (index[1] + xcenter) * (448/7.0)
-  ycenter = (index[0] + ycenter) * (448/7.0)
+  threshold = 0.05
+  print('Max is: ', np.max(P))
+  for grid_x in range(7):
+      for grid_y in range(7):
+          if np.max(P[grid_y, grid_x, :, :]) < threshold:
+              continue
 
-  w = w * 448
-  h = h * 448
+          print('Adding object:')
+          print(grid_x, grid_y)
+          print(np.max(P[grid_y, grid_x, :, :]))
+          class_index = np.argmax(P[grid_y, grid_x, :, :])
+          asd = P[grid_y, grid_x, :, :]
+          class_index = np.unravel_index(class_index, asd.shape)
+          class_num = class_index[1]
+          box_num = class_index[0]
+          print('Box: ', box_num)
+          max_coordinate = coordinate[grid_y, grid_x, box_num, :]
+          xcenter = max_coordinate[0]
+          ycenter = max_coordinate[1]
+          w = max_coordinate[2]
+          h = max_coordinate[3]
 
-  xmin = xcenter - w/2.0
-  ymin = ycenter - h/2.0
+          xcenter = (grid_x + xcenter) * (448.0/7.0)
+          ycenter = (grid_y + ycenter) * (448.0/7.0)
 
-  xmax = xmin + w
-  ymax = ymin + h
+          w = w * 448
+          h = h * 448
+          print('Size: ', w, h)
+          print('Center: ', xcenter, ycenter)
 
-  return xmin, ymin, xmax, ymax, class_num
+          xmin = xcenter - w/2.0
+          ymin = ycenter - h/2.0
 
-common_params = {'image_size': 448, 'num_classes': 20, 
-                'batch_size':1}
-net_params = {'cell_size': 7, 'boxes_per_cell':2, 'weight_decay': 0.0005}
+          xmax = xmin + w
+          ymax = ymin + h
+          print('Class detected: ', classes_name[class_num])
+          objects.append({
+            'class_name': classes_name[class_num],
+            'xmin': int(xmin),
+            'ymin': int(ymin),
+            'xmax': int(xmax),
+            'ymax': int(ymax)
+          })
+
+  return objects
+
+common_params = {'image_size': 448, 'num_classes': 20, 'batch_size': 1}
+net_params = {'cell_size': 7, 'boxes_per_cell': 2, 'weight_decay': 0.0005}
 
 net = YoloTinyNet(common_params, net_params, test=True)
 
@@ -65,11 +82,11 @@ predicts = net.inference(image)
 sess = tf.Session()
 
 # Load and resize image
-img = PIL.Image.open('cat.jpg')
+img = PIL.Image.open('test.jpg')
 resized_img = img.resize((448, 448), PIL.Image.ANTIALIAS)
 np_img = np.array(resized_img)
 np_img = np_img.astype(np.float32)
-np_img = np_img / 255.0 * 2 - 1
+np_img = (np_img / 255.0) * 2 - 1
 np_img = np.reshape(np_img, (1, 448, 448, 3))
 
 saver = tf.train.Saver(net.trainable_collection)
@@ -78,27 +95,36 @@ saver.restore(sess,'models/pretrain/yolo_tiny.ckpt')
 
 np_predict = sess.run(predicts, feed_dict={image: np_img})
 
-xmin, ymin, xmax, ymax, class_num = process_predicts(np_predict)
-class_name = classes_name[class_num]
+objects = process_predicts(np_predict)
 
 
-def draw_box(ax, xmin, ymin, xmax, ymax):
+def draw_object(ax, object):
     ax.add_patch(
         patches.Rectangle(
-            (xmin, ymin),  # (x,y)
-            xmax-xmin,  # width
-            ymax-ymin,  # height
+            (object['xmin'], object['ymin']),  # (x,y)
+            object['xmax']-object['xmin'],  # width
+            object['ymax']-object['ymin'],  # height
             fill=False,
             edgecolor='red',
             linewidth=2,
+        )
+    )
+    center_x = object['xmin'] + (object['xmax']-object['xmin'])/2.0
+    center_y = object['ymin'] + (object['ymax']-object['ymin'])/2.0
+    print('Center: ', center_x, center_y)
+    ax.add_patch(
+        patches.Circle(
+            (center_x, center_y),
+            color='green'
         )
     )
 
 # Draw image and box
 f, ax = plt.subplots(1, 1, figsize=(20, 20))
 ax.imshow(resized_img)
-draw_box(ax, int(xmin), int(ymin), int(xmax), int(ymax))
-print(class_name)
+for object in objects:
+    print(object)
+    draw_object(ax, object)
 plt.show()
 
 sess.close()
