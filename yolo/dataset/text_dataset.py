@@ -1,6 +1,6 @@
 import os
 import math
-import PIL
+from PIL import Image
 import random
 import numpy as np
 from queue import Queue 
@@ -76,14 +76,14 @@ class TextDataSet(DataSet):
       labels: 2-D list [self.max_objects, 5] (xcenter, ycenter, w, h, class_num)
       object_num:  total object number  int 
     """
-    image = PIL.Image.open(record[0])
+    image = Image.open(record[0])
     h = image.height
     w = image.width
 
     width_rate = self.width * 1.0 / w 
     height_rate = self.height * 1.0 / h 
 
-    image = image.resize((self.height, self.width), PIL.Image.ANTIALIAS)
+    image = image.resize((self.height, self.width), Image.ANTIALIAS)
     image = np.array(image)
 
     labels = [[0, 0, 0, 0, 0]] * self.max_objects

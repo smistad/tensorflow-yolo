@@ -7,7 +7,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import PIL
+from PIL import Image
 
 classes_name = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train","tvmonitor"]
 
@@ -82,8 +82,8 @@ predicts = net.inference(image)
 sess = tf.Session()
 
 # Load and resize image
-img = PIL.Image.open('test.jpg')
-resized_img = img.resize((448, 448), PIL.Image.ANTIALIAS)
+img = Image.open('helene.jpg')
+resized_img = img.resize((448, 448), Image.ANTIALIAS)
 np_img = np.array(resized_img)
 np_img = np_img.astype(np.float32)
 np_img = (np_img / 255.0) * 2 - 1
