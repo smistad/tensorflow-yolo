@@ -8,6 +8,7 @@ import re
 import sys
 import time
 from datetime import datetime
+from math import floor
 
 from yolo.solver.solver import Solver
 
@@ -44,7 +45,8 @@ class YoloSolver(Solver):
       train_op: op for training
     """
 
-    opt = tf.train.MomentumOptimizer(self.learning_rate, self.moment)
+    self.learning_rate_tensor = tf.placeholder(tf.float32, shape=[])
+    opt = tf.train.MomentumOptimizer(learning_rate=self.learning_rate_tensor, momentum=self.moment)
     grads = opt.compute_gradients(self.total_loss)
 
     apply_gradient_op = opt.apply_gradients(grads, global_step=self.global_step)
@@ -85,28 +87,45 @@ class YoloSolver(Solver):
       start_time = time.time()
       np_images, np_labels, np_objects_num = self.dataset.batch()
 
-      _, loss_value, nilboy = sess.run([self.train_op, self.total_loss, self.nilboy], feed_dict={self.images: np_images, self.labels: np_labels, self.objects_num: np_objects_num})
-      #loss_value, nilboy = sess.run([self.total_loss, self.nilboy], feed_dict={self.images: np_images, self.labels: np_labels, self.objects_num: np_objects_num})
-
+      _, loss_value, nilboy = sess.run(
+        [self.train_op, self.total_loss, self.nilboy],
+        feed_dict={
+          self.learning_rate_tensor: self.learning_rate,
+          self.net.dropout_prob: 0.5,
+          self.images: np_images,
+          self.labels: np_labels,
+          self.objects_num: np_objects_num
+        })
 
       duration = time.time() - start_time
 
       assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
+      epoch = floor(step / self.dataset.num_batch_per_epoch)
 
       if step % 10 == 0:
         num_examples_per_step = self.dataset.batch_size
         examples_per_sec = num_examples_per_step / duration
         sec_per_batch = float(duration)
 
-        format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
+        format_str = ('%s: step %d, epoch %d, learning rate = %f, loss = %.2f (%.1f examples/sec; %.3f '
                       'sec/batch)')
-        print (format_str % (datetime.now(), step, loss_value,
+        print(format_str % (datetime.now(), step, epoch, self.learning_rate, loss_value,
                              examples_per_sec, sec_per_batch))
 
         sys.stdout.flush()
       if step % 100 == 0:
-        summary_str = sess.run(summary_op, feed_dict={self.images: np_images, self.labels: np_labels, self.objects_num: np_objects_num})
+        summary_str = sess.run(summary_op, feed_dict={
+          self.learning_rate_tensor: self.learning_rate,
+          self.net.dropout_prob: 0.5,
+          self.images: np_images,
+          self.labels: np_labels,
+          self.objects_num: np_objects_num
+        })
         summary_writer.add_summary(summary_str, step)
+      if epoch > 10:
+        self.learning_rate = 0.0001
+      elif epoch > 20:
+        self.learning_rate = 0.00001
       if step % 5000 == 0:
         saver2.save(sess, self.train_dir + '/model.ckpt', global_step=step)
     sess.close()

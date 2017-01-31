@@ -92,8 +92,12 @@ np_img = np.reshape(np_img, (1, 448, 448, 3))
 saver = tf.train.Saver(net.trainable_collection)
 
 saver.restore(sess,'models/pretrain/yolo_tiny.ckpt')
+#saver.restore(sess,'models/train/model.ckpt-5000')
 
-np_predict = sess.run(predicts, feed_dict={image: np_img})
+np_predict = sess.run(predicts, feed_dict={
+    image: np_img,
+    #net.dropout_prob: 1.0,
+})
 
 objects = process_predicts(np_predict)
 
