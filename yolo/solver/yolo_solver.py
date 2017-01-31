@@ -61,7 +61,7 @@ class YoloSolver(Solver):
     self.predicts = self.net.inference(self.images)
     self.total_loss, self.nilboy = self.net.loss(self.predicts, self.labels, self.objects_num)
     
-    tf.scalar_summary('loss', self.total_loss)
+    tf.summary.scalar('loss', self.total_loss)
     self.train_op = self._train()
 
   def solve(self):
@@ -69,9 +69,9 @@ class YoloSolver(Solver):
     #saver1 = tf.train.Saver(self.net.trainable_collection)
     saver2 = tf.train.Saver(self.net.trainable_collection)
 
-    init =  tf.initialize_all_variables()
+    init = tf.global_variables_initializer()
 
-    summary_op = tf.merge_all_summaries()
+    summary_op = tf.summary.merge_all()
 
     sess = tf.Session()
 
@@ -79,7 +79,7 @@ class YoloSolver(Solver):
     saver1.restore(sess, self.pretrain_path)
 
 
-    summary_writer = tf.train.SummaryWriter(self.train_dir, sess.graph)
+    summary_writer = tf.summary.FileWriter(self.train_dir, sess.graph)
 
     for step in range(self.max_iterators):
       start_time = time.time()
